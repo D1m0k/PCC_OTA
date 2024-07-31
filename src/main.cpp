@@ -8,15 +8,15 @@
 #include <PubSubClient.h>
 
 // Пины по умолчанию
-int oneWireBusPin = 4;
+#define DEFAULT_ONE_WIRE_BUS 4 // Пин по умолчанию для подключения датчиков
 
-// Объявление объектов
-OneWire oneWire(oneWireBusPin);
-DallasTemperature sensors(&oneWire);
-WiFiClient espClient;
-PubSubClient client(espClient);
-AsyncWebServer server(80);
-DNSServer dns;
+// // Объявление объектов
+// OneWire oneWire(oneWireBusPin);
+// DallasTemperature sensors(&oneWire);
+// WiFiClient espClient;
+// PubSubClient client(espClient);
+// AsyncWebServer server(80);
+// DNSServer dns;
 
 const char* configFile = "/config.json";
 
@@ -45,12 +45,20 @@ struct Config {
   std::vector<ButtonConfig> buttons;
 };
 
-Config config = {
-  "", "", "", "", "",
-  "CPU", "CHIPSET",
-  oneWireBusPin
-  // {{"Reset", 25, 1000, "esp32/reset", OUTPUT}, {"Power", 26, 1000, "esp32/power", OUTPUT}}
-};
+// Config config = {
+//   "", "", "", "", "",
+//   "CPU", "CHIPSET",
+//   oneWireBusPin
+//   // {{"Reset", 25, 1000, "esp32/reset", OUTPUT}, {"Power", 26, 1000, "esp32/power", OUTPUT}}
+// };
+
+Config config;
+AsyncWebServer server(80);
+DNSServer dns;
+WiFiClient espClient;
+PubSubClient client(espClient);
+OneWire *oneWire;
+DallasTemperature *sensors;
 
 // Функция загрузки конфигурации
 void loadConfig() {
@@ -68,8 +76,8 @@ void loadConfig() {
           config.mqtt_password = doc["mqtt_password"].as<String>();
           config.sensor1_name = doc["sensor1_name"].as<String>();
           config.sensor2_name = doc["sensor2_name"].as<String>();
-          config.oneWireBus_pin = doc["oneWireBus_pin"].as<int>();
-          oneWireBusPin = config.oneWireBus_pin;
+          config.oneWireBus_pin = doc["oneWireBus_pin"].as<int>()  | DEFAULT_ONE_WIRE_BUS;;
+          // oneWireBusPin = config.oneWireBus_pin;
 
           JsonArray buttons = doc["buttons"].as<JsonArray>();
           for (JsonObject btn : buttons) {
@@ -149,7 +157,6 @@ void handleSaveConfig(AsyncWebServerRequest *request) {
   if (request->hasParam("sensor2_name", true)) config.sensor2_name = request->getParam("sensor2_name", true)->value();
   if (request->hasParam("oneWireBus_pin", true)) {
     config.oneWireBus_pin = request->getParam("oneWireBus_pin", true)->value().toInt();
-    oneWireBusPin = config.oneWireBus_pin;
   }
   
   config.buttons.clear();
@@ -245,9 +252,9 @@ void handleButtonState(AsyncWebServerRequest *request) {
 }
 
 void handleTemperature(AsyncWebServerRequest *request) {
-  sensors.requestTemperatures();
-  float temp1 = sensors.getTempCByIndex(0);
-  float temp2 = sensors.getTempCByIndex(1);
+  sensors->requestTemperatures();
+  float temp1 = sensors->getTempCByIndex(0);
+  float temp2 = sensors->getTempCByIndex(1);
   String json = "{\"temp1\":" + String(temp1) + ",\"temp2\":" + String(temp2) + "}";
   request->send(200, "application/json", json);
 }
@@ -261,6 +268,9 @@ void setup() {
 
   loadConfig();
 
+  oneWire = new OneWire(config.oneWireBus_pin);
+  sensors = new DallasTemperature(oneWire);
+  sensors->begin();
   // Настройка WiFi
   Serial.println("Setting up WiFi...");
   AsyncWiFiManager wifiManager(&server, &dns);
@@ -467,8 +477,8 @@ void setup() {
     request->send(200, "application/json", json);
   });
   server.begin();
-
-  sensors.begin();
+  sensors->begin();
+  
 }
 
 void reconnect() {
