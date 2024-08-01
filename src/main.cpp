@@ -367,6 +367,7 @@ void handleOTA(AsyncWebServerRequest *request) {
   html += "<input type='text' name='url' placeholder='Firmware URL'>";
   html += "<input type='submit' value='Update'>";
   html += "</form>";
+  html += "<button onclick=\"location.href='/'\">BACK</button><br>";
   html += "</body></html>";
   request->send(200, "text/html", html);
 }
