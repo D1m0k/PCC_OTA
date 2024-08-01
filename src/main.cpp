@@ -6,6 +6,13 @@
 #include <OneWire.h>
 #include <DallasTemperature.h>
 #include <PubSubClient.h>
+#ifdef ESP32
+  #include <Update.h>
+  #include <HTTPUpdate.h>
+#else
+  #include <ESP8266HTTPUpdate.h>
+#endif
+
 
 // Пины по умолчанию
 #define DEFAULT_ONE_WIRE_BUS 4 // Пин по умолчанию для подключения датчиков
@@ -259,6 +266,111 @@ void handleTemperature(AsyncWebServerRequest *request) {
   request->send(200, "application/json", json);
 }
 
+void handleUpdate(AsyncWebServerRequest *request) {
+  AsyncWebServerResponse *response = request->beginResponse(200, "text/plain", (Update.hasError()) ? "Update Failed" : "Update Success");
+  response->addHeader("Connection", "close");
+  request->send(response);
+  delay(1000);
+  ESP.restart();
+}
+
+void handleUpdateUpload(AsyncWebServerRequest *request, const String& filename, size_t index, uint8_t *data, size_t len, bool final) {
+  if (!index) {
+    Serial.printf("Update: %s\n", filename.c_str());
+    if (!Update.begin(UPDATE_SIZE_UNKNOWN)) { // start with max available size
+      Update.printError(Serial);
+    }
+  }
+  if (Update.write(data, len) != len) {
+    Update.printError(Serial);
+  }
+  if (final) {
+    if (Update.end(true)) { // true to set the size to the current progress
+      Serial.printf("Update Success: %u\nRebooting...\n", index + len);
+    } else {
+      Update.printError(Serial);
+    }
+  }
+}
+
+void handleUpdateUrl(AsyncWebServerRequest *request) {
+  if (request->hasParam("url", true)) {
+    String url = request->getParam("url", true)->value();
+    WiFiClient client;
+
+#ifdef ESP32
+    HTTPClient http;
+    http.begin(client, url);  // Use WiFiClientSecure for HTTPS
+    int httpCode = http.GET();
+    if (httpCode == HTTP_CODE_OK) {
+      WiFiClient * stream = http.getStreamPtr();
+      size_t total = http.getSize();
+      size_t written = 0;
+      if (Update.begin(total)) {
+        written = Update.writeStream(*stream);
+        if (written == total) {
+          if (Update.end(true)) {
+            Serial.println("Update Success: Rebooting...");
+            request->send(200, "text/plain", "Update Success: Rebooting...");
+            delay(1000);
+            ESP.restart();
+          } else {
+            Serial.printf("Update failed. Error #: %u\n", Update.getError());
+            request->send(500, "text/plain", "Update failed");
+          }
+        } else {
+          Serial.printf("Written only : %u/%u bytes\n", written, total);
+          request->send(500, "text/plain", "Update failed");
+        }
+      } else {
+        Serial.printf("Not enough space to begin OTA\n");
+        request->send(500, "text/plain", "Not enough space");
+      }
+    } else {
+      Serial.printf("HTTP GET failed. Error #: %d\n", httpCode);
+      request->send(500, "text/plain", "HTTP GET failed");
+    }
+    http.end();
+
+#else
+    HTTPUpdateResult ret = ESPhttpUpdate.update(client, url);
+    switch (ret) {
+      case HTTP_UPDATE_FAILED:
+        Serial.printf("HTTP_UPDATE_FAILED Error (%d): %s\n", ESPhttpUpdate.getLastError(), ESPhttpUpdate.getLastErrorString().c_str());
+        request->send(500, "text/plain", "HTTP_UPDATE_FAILED");
+        break;
+      case HTTP_UPDATE_NO_UPDATES:
+        Serial.println("HTTP_UPDATE_NO_UPDATES");
+        request->send(200, "text/plain", "HTTP_UPDATE_NO_UPDATES");
+        break;
+      case HTTP_UPDATE_OK:
+        Serial.println("HTTP_UPDATE_OK");
+        request->send(200, "text/plain", "Update Success: Rebooting...");
+        delay(1000);
+        ESP.restart();
+        break;
+    }
+#endif
+  } else {
+    request->send(400, "text/plain", "Invalid request");
+  }
+}
+
+void handleOTA(AsyncWebServerRequest *request) {
+  String html = "<html><body>";
+  html += "<h1>OTA Update</h1>";
+  html += "<form method='POST' action='/update' enctype='multipart/form-data'>";
+  html += "<input type='file' name='update'>";
+  html += "<input type='submit' value='Upload'>";
+  html += "</form>";
+  html += "<form method='POST' action='/update_url'>";
+  html += "<input type='text' name='url' placeholder='Firmware URL'>";
+  html += "<input type='submit' value='Update'>";
+  html += "</form>";
+  html += "</body></html>";
+  request->send(200, "text/html", html);
+}
+
 void setup() {
   Serial.begin(115200);
   if (!LittleFS.begin()) {
@@ -371,6 +483,7 @@ void setup() {
     html += "<button type=\"button\" onclick=\"addButton()\">Add Button</button><br>";
     html += "<input type=\"submit\" value=\"Save\">";
     html += "<button onclick=\"location.href='/'\">BACK</button><br>";
+    html += "<button onclick=\"location.href='/ota'\">OTA FW Update</button><br>";
     // html += "<form action=\"/\" method=\"GET\"><button type=\"submit\">Back</button></form>";
     html += "</form>";
     html += "<script>";
@@ -445,6 +558,11 @@ void setup() {
   server.on("/deleteButton", HTTP_POST, handleDeleteButton);
   server.on("/restart", HTTP_POST, handleRestart);
   server.on("/temp", HTTP_GET, handleTemperature);
+  server.on("/ota", HTTP_GET, handleOTA);
+  server.on("/update", HTTP_POST, [](AsyncWebServerRequest *request) {
+    request->send(200);
+  }, handleUpdateUpload);
+  server.on("/update_url", HTTP_POST, handleUpdateUrl);
   server.on("/trigger", HTTP_GET, [](AsyncWebServerRequest *request){
     if (request->hasParam("pin") && request->hasParam("duration")) {
       int pin = request->getParam("pin")->value().toInt();
@@ -478,7 +596,7 @@ void setup() {
   });
   server.begin();
   sensors->begin();
-  
+
 }
 
 void reconnect() {
