@@ -8,5 +8,5 @@
 .pio/build/*
 !.pio/build/lolin_s2_mini/
 .pio/build/lolin_s2_mini/*
-!.pio/build/lolin_s2_mini/*bin
+!.pio/build/lolin_s2_mini/*.bin
 
