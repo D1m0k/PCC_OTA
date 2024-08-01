@@ -3,8 +3,11 @@
 .vscode/launch.json
 .vscode/ipch
 .vscode/arduino.json
-.pio/**/**/
-.pio/**/
+.pio/*
+!.pio/build/
+.pio/build/*
+!.pio/build/lolin_s2_mini/
+.pio/build/lolin_s2_mini/*
 !.pio/build/lolin_s2_mini/firmware*
 !.pio/build/lolin_s2_mini/partitions*
 !.pio/build/lolin_s2_mini/bootloader*
