@@ -4,6 +4,6 @@ Ouptocoupler connects to maiboard pins like Power, Reset, Pwr led and controls i
 You need ESP32 board like lolin s2 mini, optional 2x ds18b20 and PC817 3.6-30V 2 4 Channel Optocoupler (search on ali)
 Project uses PlatformIO CI/CD template to generate new fw, in futere i plan to add autoupdate function to boards
 
-~~~PROJECT IS PRE ALPHA, use it for own risks!~~~
+!!!PROJECT IS PRE ALPHA, use it for own risk!!!
 
 !!!Check MB pins polarity before connect it to ouptocoupler!!!
