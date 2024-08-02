@@ -1,14 +1,9 @@
-# PlatformIO CI/CD template
+PC Control with OTA ()
+It can add buttons to esp pins, with managed delay of push, and control them from web and mqtt. Output buttons can be assigned to mqtt topics. 
+Ouptocoupler connects to maiboard pins like Power, Reset, Pwr led and controls it.
+You need ESP32 board like lolin s2 mini, optional 2x ds18b20 and PC817 3.6-30V 2 4 Channel Optocoupler (search on ali)
+Project uses PlatformIO CI/CD template to generate new fw, in futere i plan to add autoupdate function to boards
 
-This repository template contains all the necessary files to:
+~~~PROJECT IS PRE ALPHA, use it for own risks!~~~
 
-1. Do PlatformIO development with VSCode and remote development containers.
-2. GitHub actions for CI/CD, including attaching firmware binaries automatically to every pull request
-   and on every GitHub release.
-3. Automatic version number assignment at build time. Local builds get version `0.0.1`, pull request
-   builds get version `0.0.{pull request number}` and release builds get the version from the GitHub
-   release tag.
-
-## Using this repository template
-
-Using this repository template is easy: just hit the _Use this template_ button and make a new repo. That's it!
+!!!Check MB pins polarity before connect it to ouptocoupler!!!
